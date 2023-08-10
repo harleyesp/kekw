@@ -1,53 +1,98 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace HelloWorldApp
+class Program
 {
-    class Program
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern IntPtr GetConsoleWindow();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr GetStdHandle(int nStdHandle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool WriteConsole(IntPtr hConsoleOutput, string lpBuffer, uint nNumberOfCharsToWrite, out uint lpNumberOfCharsWritten, IntPtr lpReserved);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleCursorPosition(IntPtr hConsoleOutput, COORD dwCursorPosition);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct COORD
     {
-        static void Main(string[] args)
+        public short X;
+        public short Y;
+    }
+
+    const int STD_OUTPUT_HANDLE = -11;
+    const uint STD_OUTPUT_HANDLE_ID = 7;
+
+    static void Main(string[] args)
+    {
+        string message = "Hello World";
+        IntPtr hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        TypeWriterEffect(hConsole, message);
+        Console.WriteLine(); // Move to the next line after typing is complete
+    }
+
+    static void TypeWriterEffect(IntPtr hConsole, string text)
+    {
+        uint charsWritten;
+        COORD initialCursorPosition;
+        GetCursorPosition(hConsole, out initialCursorPosition);
+
+        foreach (char c in text)
         {
-            string greeting = "Hello, ";
-            string target = "World";
-            string punctuation = "!";
-            
-            Console.Write(greeting);
-            TypeWriterEffect(target);
-            Console.WriteLine(punctuation);
-            
-            Console.WriteLine("The current date is: " + DateTime.Now.ToString("yyyy-MM-dd"));
-            Console.WriteLine("The time is: " + DateTime.Now.ToString("HH:mm:ss"));
-            
-            int count = 0;
-            while (count < 3)
-            {
-                Console.WriteLine("Printing again...");
-                count++;
-            }
-            
-            Console.WriteLine("Calculating some meaningless math:");
-            int result = 10 * 5 + 3 / 2 - 7;
-            Console.WriteLine("Result: " + result);
-            
-            Console.WriteLine("Generating random numbers:");
-            Random random = new Random();
-            for (int j = 0; j < 5; j++)
-            {
-                Console.WriteLine("Random number " + (j + 1) + ": " + random.Next(1, 100));
-            }
-            
-            Console.WriteLine("And that's the end of the program!");
+            WriteConsole(hConsole, c.ToString(), 1, out charsWritten, IntPtr.Zero);
+            Thread.Sleep(100); // Adjust the delay to control typing speed
         }
-        
-        static void TypeWriterEffect(string text)
+
+        COORD finalCursorPosition = new COORD { X = initialCursorPosition.X, Y = initialCursorPosition.Y };
+        SetConsoleCursorPosition(hConsole, finalCursorPosition);
+    }
+
+    static void GetCursorPosition(IntPtr hConsole, out COORD cursorPosition)
+    {
+        cursorPosition = new COORD();
+        if (hConsole != IntPtr.Zero)
         {
-            for (int i = 0; i < text.Length; i++)
+            IntPtr consoleHandle = GetConsoleWindow();
+            if (consoleHandle != IntPtr.Zero)
             {
-                Console.Write(text[i]);
-                Thread.Sleep(100); // Adjust the delay to control typing speed
+                if (GetConsoleScreenBufferInfo(hConsole, out CONSOLE_SCREEN_BUFFER_INFO bufferInfo))
+                {
+                    cursorPosition = bufferInfo.dwCursorPosition;
+                }
             }
-            
-            Console.WriteLine(); // Move to the next line after typing is complete
         }
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct COORD
+    {
+        public short X;
+        public short Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SMALL_RECT
+    {
+        public short Left;
+        public short Top;
+        public short Right;
+        public short Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CONSOLE_SCREEN_BUFFER_INFO
+    {
+        public COORD dwSize;
+        public COORD dwCursorPosition;
+        public short wAttributes;
+        public SMALL_RECT srWindow;
+        public COORD dwMaximumWindowSize;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetConsoleScreenBufferInfo(IntPtr hConsoleOutput, out CONSOLE_SCREEN_BUFFER_INFO lpConsoleScreenBufferInfo);
 }
